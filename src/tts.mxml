@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:Application xmlns:fx="http://ns.adobe.com/mxml/2009" 
+			   xmlns:s="library://ns.adobe.com/flex/spark" 
+			   xmlns:mx="library://ns.adobe.com/flex/mx" minWidth="955" minHeight="600" creationComplete="init()">
+	<fx:Declarations>
+		<!-- 将非可视元素（例如服务、值对象）放在此处 -->
+		<s:RadioButtonGroup id="myGroup"/>
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.iflytek.define.ErrorCode;
+			import com.iflytek.events.MSCErrorEvent;
+			import com.iflytek.events.MSCEvent;
+			import com.iflytek.events.MSCSynthAudioEvent;
+			import com.iflytek.msc.Synthesizer;
+			
+			import flash.events.MouseEvent;
+			import flash.events.SecurityErrorEvent;
+			import flash.utils.ByteArray;
+			
+			import mx.events.FlexEvent;
+			
+			private var synth:Synthesizer = null;
+			private var configs:String = new String();
+			private var audio_data:ByteArray = new ByteArray();
+			private var isErrorHappened:Boolean = false;
+			
+			
+			private function init():void{
+				
+				
+				Security.allowDomain('*');
+				
+				
+				configs = "timeout=30000, appid=52a569c9";
+				synth = new Synthesizer( configs, "dev.voicecloud.cn", -1 );
+				synth.addEventListener( MSCSynthAudioEvent.AUDIO_GET, onGetAudioData );
+				synth.addEventListener( MSCEvent.SYNTH_READY_TO_PLAY, onStartPlay );
+				synth.addEventListener( MSCEvent.SYNTH_PLAY_WAITDATA, onWaitData );
+				synth.addEventListener( MSCEvent.SYNTH_PLAY_COMPLETED, onPlayEnd );
+				synth.addEventListener( MSCEvent.SYNTH_COMPLETED, onEnd );
+				synth.addEventListener( MSCErrorEvent.ERROR, onError );
+				synth.addEventListener( SecurityErrorEvent.SECURITY_ERROR, onSecurityError );
+				
+				
+			}
+			
+			
+			private function onGetAudioData( e:MSCSynthAudioEvent ):void
+			{
+				trace("get audio data.");
+				audio_data.writeBytes( e.data );
+				lblStatus.text = e.audioInfo;
+			}
+			
+			private function onEnd( e:MSCEvent ):void
+			{
+				if(!isErrorHappened)
+				{
+					lblStatus.text = "合成完成,可以保存";
+					btnSave.enabled=true;
+					switch(synth.Play()){
+						case ErrorCode.MSP_ERROR_FLASH_PLAYER_NODATA:
+							lblStatus.text="没有音频";
+							break;
+						case ErrorCode.MSP_ERROR_FLASH_PLAYER_EXIST:
+							lblStatus.text="播放实例已经存在";
+							break;
+						default:break;
+					}
+				}
+				
+				btnSyn.enabled = true;
+			}
+			
+			private function onStartPlay( e:MSCEvent ):void
+			{
+				trace("StartPlay");
+				
+			}
+			
+			private function onWaitData( e:MSCEvent ):void
+			{
+				trace("onWaitData");
+				
+			}
+			
+			private function onPlayEnd( e:MSCEvent ):void
+			{
+				trace("onPlayEnd");
+			}
+			
+			private function onError( e:MSCErrorEvent ):void
+			{
+				trace("onError");
+				isErrorHappened = true;
+				
+				trace(e.message);
+				
+				lblStatus.text = e.message;
+			}
+			
+			private function onSecurityError( e:SecurityErrorEvent ):void
+			{
+				trace( "Security Error:" + e );
+			}
+			
+			
+			private function onSynthsize(e:Event):void{
+				
+				if(textArea.text==''){
+					lblStatus.text='请输入要合成的文字';
+					return;
+				}
+					//合成 rate:11025 ent:vivi21
+					var tts_params:String = "ssm=1,auf=audio/L16;rate=11025,ent=vivi21,vcn="+myGroup.selectedValue.toString()+",spd=default,vol=default,ttp=text,bgs=0";
+					audio_data.clear();
+					var ret:int = synth.synthStart(textArea.text.toLowerCase(), tts_params );
+					if( 0 != ret )
+					{
+						lblStatus.text = "Error: #" + String(ret);
+					}
+					isErrorHappened = false;
+					
+					btnSyn.enabled = false;
+					btnSave.enabled = false;
+				
+			}
+			
+			private function onSave( e:MouseEvent ):void {
+				var fileRefenrence:FileReference = new FileReference();
+				var wavData:ByteArray = new ByteArray();
+				synth.addWaveHeader( wavData, audio_data );
+				fileRefenrence.save( wavData, textArea.text.toLowerCase()+".wav" ); 
+			}
+				
+		]]>
+	</fx:Script>
+	<s:TextArea id="textArea" x="2" y="2" width="400" height="200">
+		
+	</s:TextArea>
+	
+	<s:RadioButton label="女声" id="woman" value="Catherine" groupName="myGroup" selected="true" x="2" y="210" width="50" height="20"/>
+	<s:RadioButton label="男声" id="man" value="henry" groupName="myGroup" x="55" y="210" width="50" height="20"/>
+	<s:Button label="Play" icon="" id="btnSyn" click="onSynthsize(event)" x="110" y="210" width="50" height="20"/>
+	<s:Button label="Save" icon="" id="btnSave" click="onSave(event)" x="170" y="210" width="70" height="20" enabled="false"/>
+	<s:Label id="lblStatus" width="200" height="20" text="状态" x="250" y="210"/>
+</s:Application>
